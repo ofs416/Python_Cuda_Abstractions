@@ -286,57 +286,77 @@ def matmul_jit_kernel(a, b, c, m: int, n: int, k: int):
     """JIT-compiled CUDA kernel for matrix multiplication."""
     BLOCK_SIZE = 16
     
-    smem_a = jit.shared_memory(shape=(BLOCK_SIZE, BLOCK_SIZE), dtype=float)
-    smem_b = jit.shared_memory(shape=(BLOCK_SIZE, BLOCK_SIZE), dtype=float)
+    # Define shared memory
+    smem_a = jit.shared_memory(shape=(BLOCK_SIZE, BLOCK_SIZE), dtype=cp.float32)
+    smem_b = jit.shared_memory(shape=(BLOCK_SIZE, BLOCK_SIZE), dtype=cp.float32)
     
+    # Get thread and block indices
     tx = jit.threadIdx.x
     ty = jit.threadIdx.y
     bx = jit.blockIdx.x
     by = jit.blockIdx.y
     
+    # Calculate global indices
     row = by * BLOCK_SIZE + ty
     col = bx * BLOCK_SIZE + tx
     
-    sum = 0.0
+    # Initialize accumulator
+    sum = cp.float32(0.0)
     
+    # Loop over tiles
     for tile in range((k + BLOCK_SIZE - 1) // BLOCK_SIZE):
+        # Load data into shared memory
         if row < m and tile * BLOCK_SIZE + tx < k:
             smem_a[ty, tx] = a[row, tile * BLOCK_SIZE + tx]
         else:
-            smem_a[ty, tx] = 0.0
+            smem_a[ty, tx] = cp.float32(0.0)
             
         if tile * BLOCK_SIZE + ty < k and col < n:
             smem_b[ty, tx] = b[tile * BLOCK_SIZE + ty, col]
         else:
-            smem_b[ty, tx] = 0.0
+            smem_b[ty, tx] = cp.float32(0.0)
             
+        # Synchronize threads
         jit.sync_threads()
         
+        # Compute partial sum
         for i in range(BLOCK_SIZE):
             sum += smem_a[ty, i] * smem_b[i, tx]
             
+        # Synchronize before next iteration
         jit.sync_threads()
     
+    # Write result
     if row < m and col < n:
         c[row, col] = sum
 
 def run_cupy_jit(A, B):
-    """Matrix multiplication using JIT-compiled kernel."""
-    A = cp.array(A)
-    B = cp.array(B)
-    m, k = A.shape
-    _, n = B.shape
-    
-    C = cp.empty((m, n), dtype=cp.float32)
-    
-    block_size = 16
-    grid_x = (n + block_size - 1) // block_size
-    grid_y = (m + block_size - 1) // block_size
-    
-    matmul_jit_kernel(
-        (grid_x, grid_y),
-        (block_size, block_size),
-        (A, B, C, m, n, k)
-    )
-    
-    return cp.asnumpy(C)
+    """Run matrix multiplication using CuPy JIT kernel."""
+    # Initialize CUDA device
+    with cp.cuda.Device(0):
+        # Convert inputs to CuPy arrays
+        A_gpu = cp.array(A, dtype=cp.float32)
+        B_gpu = cp.array(B, dtype=cp.float32)
+        
+        # Get dimensions
+        m, k = A_gpu.shape
+        _, n = B_gpu.shape
+        
+        # Allocate output
+        C_gpu = cp.empty((m, n), dtype=cp.float32)
+        
+        # Calculate grid and block dimensions
+        block_size = 16
+        grid_x = (n + block_size - 1) // block_size
+        grid_y = (m + block_size - 1) // block_size
+        
+        # Launch kernel
+        matmul_jit_kernel(
+            (grid_x, grid_y),
+            (block_size, block_size),
+            (A_gpu, B_gpu, C_gpu, m, n, k)
+        )
+        
+        # Synchronize and return
+        cp.cuda.stream.get_current_stream().synchronize()
+        return cp.asnumpy(C_gpu)

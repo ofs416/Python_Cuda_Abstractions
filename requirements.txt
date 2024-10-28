@@ -1,0 +1,7 @@
+numpy 
+torch
+triton
+numba 
+taichi
+cupy
+pycuda
