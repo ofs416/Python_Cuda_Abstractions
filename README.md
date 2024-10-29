@@ -1,6 +1,5 @@
 # Python_Cuda_Abstractions
 
-Comparison of several cuda abstractions in python.
 This will help me gauge an approximation of the performance and ease of use trade-off offered by differing levels of abstractions.
 
 ## Running
