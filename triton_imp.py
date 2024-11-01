@@ -13,6 +13,9 @@ def matmul_kernel(
     stride_cm, stride_cn,
     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
 ):
+    """
+Kernel implementation of gemm. This version uses blocktiling, to better utilise shared memory and decrease stalling from accessing this memory.
+"""
     pid = tl.program_id(0)
     grid_m = (M + BLOCK_SIZE_M - 1) // BLOCK_SIZE_M
     grid_n = (N + BLOCK_SIZE_N - 1) // BLOCK_SIZE_N
