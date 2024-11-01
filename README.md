@@ -1,6 +1,6 @@
 # Python_Cuda_Abstractions
 
-This will help me gauge an approximation of the performance and ease of use trade-off offered by differing levels of abstractions.
+This will help me gauge an approximation of the performance and ease of use trade-off offered by differing levels of abstractions. Past projects are considerably slow due to the amount of linear algebra computations required; some of these projects currently rely on numpy, so a Library such as CuPy could be heavily beneficial. Others rely on custom functions, so Triton or Taichi may be beneficial for utilising the GPU.
 
 ## Running
 
